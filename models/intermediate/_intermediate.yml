@@ -1,0 +1,99 @@
+version: 2
+
+models:
+  - name: int_customer_financial_summary
+    description: >
+      Intermediate model that joins customer master data with account and loan
+      aggregations to produce a single customer-level financial summary. Lives in
+      the intermediate layer because it combines multiple staging sources and
+      requires coalesce logic before it is ready for the mart dimension.
+    columns:
+      - name: customer_id
+        description: Unique customer identifier — primary key.
+        tests:
+          - not_null
+      - name: customer_name
+        description: Customer full name.
+      - name: segment
+        description: Business segment.
+      - name: risk_rating
+        description: Credit risk rating.
+      - name: risk_tier
+        description: Human-readable risk tier.
+      - name: kyc_date
+        description: KYC completion date.
+      - name: kyc_age_days
+        description: Days since KYC completion.
+      - name: country_code
+        description: ISO 2-letter country code.
+      - name: total_accounts
+        description: Count of accounts held by the customer.
+      - name: total_deposits
+        description: Sum of balances on deposit accounts.
+      - name: total_credit_utilisation
+        description: Sum of balances on credit line accounts.
+      - name: customer_since
+        description: Date of earliest account opening.
+      - name: current_account_count
+        description: Number of current accounts.
+      - name: savings_account_count
+        description: Number of savings accounts.
+      - name: total_loans
+        description: Count of loans held by the customer.
+      - name: total_loan_exposure
+        description: Sum of outstanding principal across all loans.
+      - name: npl_exposure
+        description: Sum of principal on non-performing loans.
+      - name: annual_interest_income
+        description: Estimated annual interest income from all loans.
+
+  - name: int_loan_risk_metrics
+    description: >
+      Intermediate model that joins the loan book with customer attributes and
+      computes Basel II risk metrics (PD, LGD, EAD, EL, RWA). Kept in the
+      intermediate layer because Basel metric derivation is complex business
+      logic that deserves its own testable layer before mart publication.
+    columns:
+      - name: loan_id
+        description: Unique loan identifier — primary key.
+        tests:
+          - not_null
+      - name: customer_id
+        description: Foreign key to stg_customers.
+      - name: pd
+        description: Probability of Default — 1.0 for NPL, else rating-dependent.
+      - name: lgd
+        description: Loss Given Default — 0.45 (Basel II foundation IRB unsecured).
+      - name: ead
+        description: Exposure at Default — equal to outstanding principal.
+      - name: expected_loss
+        description: Expected Loss = PD × LGD × EAD.
+      - name: risk_weight
+        description: Basel II risk weight applied to EAD for RWA calculation.
+      - name: rwa
+        description: Risk-Weighted Asset = EAD × risk_weight.
+
+  - name: int_monthly_portfolio_metrics
+    description: >
+      Monthly aggregation of portfolio interest income and deposit funding costs.
+      Exists in the intermediate layer to encapsulate the full outer join and
+      coalesce logic before the monthly_nii mart simply selects from it.
+    columns:
+      - name: period_id
+        description: Row number ordered by reporting_period — surrogate key.
+        tests:
+          - not_null
+      - name: reporting_period
+        description: Month-truncated date representing the reporting period.
+      - name: interest_income
+        description: Monthly interest income from performing loans.
+      - name: interest_expense
+        description: Estimated monthly funding cost on deposit accounts.
+      - name: net_interest_income
+        description: Interest income minus interest expense.
+      - name: active_loans
+        description: Count of performing loans in the period.
+      - name: portfolio_balance
+        description: Sum of performing loan principals.
+      - name: total_deposits
+        description: Sum of deposit account balances.

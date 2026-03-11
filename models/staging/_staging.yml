@@ -1,0 +1,143 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: >
+      Standardised customer dimension. Normalises casing, derives a risk_tier
+      label from risk_rating, and computes kyc_age_days for compliance monitoring.
+    columns:
+      - name: customer_id
+        description: Unique customer identifier — primary key.
+        tests:
+          - unique
+          - not_null
+      - name: customer_name
+        description: Trimmed customer full name.
+      - name: segment
+        description: Lowercased business segment.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["retail", "institutional", "wealth", "sme"]
+      - name: risk_rating
+        description: Uppercased credit risk rating.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["A", "B", "C"]
+      - name: risk_tier
+        description: Human-readable risk tier derived from risk_rating.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["low_risk", "medium_risk", "high_risk"]
+      - name: kyc_date
+        description: KYC completion date cast to date.
+      - name: country_code
+        description: Uppercased ISO 2-letter country code.
+      - name: kyc_age_days
+        description: Days since KYC was completed — used for refresh scheduling.
+
+  - name: stg_accounts
+    description: >
+      Standardised account records. Classifies accounts into deposit vs credit
+      categories and normalises casing for downstream joins.
+    columns:
+      - name: account_id
+        description: Unique account identifier — primary key.
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Foreign key to stg_customers.
+      - name: account_type
+        description: Lowercased product type.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["current", "savings", "fixed_deposit", "credit_line"]
+      - name: open_date
+        description: Account open date cast to date.
+      - name: status
+        description: Lowercased account status.
+      - name: balance
+        description: Balance cast to numeric.
+      - name: is_deposit_account
+        description: True if account holds deposits (current, savings, fixed_deposit).
+      - name: is_credit_account
+        description: True if account is a credit facility.
+
+  - name: stg_transactions
+    description: >
+      Parsed and signed transaction ledger. Computes signed_amount (negative for
+      debits) and truncates txn_date to activity_period (month) for aggregations.
+      Contains one intentional bad row (T_BAD, amount=-200) caught by the warn test.
+    columns:
+      - name: txn_id
+        description: Unique transaction identifier — primary key.
+        tests:
+          - unique
+          - not_null
+      - name: account_id
+        description: Foreign key to stg_accounts.
+      - name: amount
+        description: Raw absolute amount from source.
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: ">= 0"
+              config:
+                severity: warn
+      - name: txn_type
+        description: Lowercased transaction direction.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["credit", "debit"]
+      - name: txn_date
+        description: Transaction posting date.
+      - name: category
+        description: Lowercased transaction category.
+      - name: signed_amount
+        description: Amount with sign applied — positive for credits, negative for debits.
+      - name: activity_period
+        description: Month-truncated transaction date for time-series aggregations.
+
+  - name: stg_loans
+    description: >
+      Enriched loan records. Derives is_npl flag from loan_status and computes
+      annual_interest_income from principal × interest_rate for NII calculations.
+    columns:
+      - name: loan_id
+        description: Unique loan identifier — primary key.
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Foreign key to stg_customers.
+      - name: principal
+        description: Outstanding principal cast to numeric.
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "> 0"
+      - name: interest_rate
+        description: Annual interest rate as a percentage.
+      - name: loan_status
+        description: Lowercased loan status.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["performing", "non-performing"]
+      - name: loan_type
+        description: Lowercased loan product type.
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["personal_loan", "mortgage", "corporate_loan", "sme_facility", "overdraft"]
+      - name: origination_date
+        description: Loan origination date cast to date.
+      - name: is_npl
+        description: True if loan_status is non-performing.
+      - name: annual_interest_income
+        description: Estimated annual interest income (principal × rate / 100).

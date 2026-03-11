@@ -1,0 +1,77 @@
+version: 2
+
+seeds:
+  - name: raw_customers
+    description: >
+      Raw customer master data loaded from source system. Contains 30 customers
+      across retail, institutional, wealth, and SME segments with KYC metadata.
+    columns:
+      - name: customer_id
+        description: Unique customer identifier (C001–C030).
+      - name: name
+        description: Customer full name.
+      - name: segment
+        description: Business segment — retail, institutional, wealth, or sme.
+      - name: risk_rating
+        description: Credit risk rating assigned by risk team — A, B, or C.
+      - name: kyc_date
+        description: Date the customer completed Know Your Customer verification.
+      - name: country
+        description: ISO 2-letter country code of customer domicile.
+
+  - name: raw_accounts
+    description: >
+      Raw account records. 50 accounts linked to customers, covering current,
+      savings, fixed deposit, and credit line product types.
+    columns:
+      - name: account_id
+        description: Unique account identifier.
+      - name: customer_id
+        description: Foreign key to raw_customers.
+      - name: account_type
+        description: Product type — current, savings, fixed_deposit, or credit_line.
+      - name: open_date
+        description: Date the account was opened.
+      - name: status
+        description: Account status — active or closed.
+      - name: balance
+        description: Current account balance in base currency (GBP).
+
+  - name: raw_transactions
+    description: >
+      Raw transaction ledger. 120 rows covering Jan–Jun 2024. Includes one
+      intentionally bad row (T_BAD) with a negative amount to demonstrate
+      data quality testing.
+    columns:
+      - name: txn_id
+        description: Unique transaction identifier.
+      - name: account_id
+        description: Foreign key to raw_accounts.
+      - name: amount
+        description: Transaction amount. Should be positive; T_BAD has -200 (intentional quality catch).
+      - name: txn_type
+        description: Direction — credit or debit.
+      - name: txn_date
+        description: Date the transaction was posted.
+      - name: category
+        description: Transaction category label.
+
+  - name: raw_loans
+    description: >
+      Raw loan book. 25 loans across personal, mortgage, corporate, SME,
+      and overdraft products. 6 non-performing loans (~24% NPL ratio by count).
+    columns:
+      - name: loan_id
+        description: Unique loan identifier.
+      - name: customer_id
+        description: Foreign key to raw_customers.
+      - name: principal
+        description: Outstanding principal balance.
+      - name: interest_rate
+        description: Annual interest rate as a percentage (e.g. 3.50 = 3.50%).
+      - name: loan_status
+        description: Current status — performing or non-performing.
+      - name: loan_type
+        description: Product type — personal_loan, mortgage, corporate_loan, sme_facility, or overdraft.
+      - name: origination_date
+        description: Date the loan was originated.

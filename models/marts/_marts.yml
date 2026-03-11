@@ -1,0 +1,352 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: >
+      Customer dimension — single source of truth for all customer attributes,
+      financial totals, and risk classification. Contract enforced.
+    config:
+      contract:
+        enforced: true
+    semantic_model:
+      enabled: true
+    columns:
+      - name: customer_id
+        description: Unique customer identifier — primary key.
+        data_type: text
+        constraints:
+          - type: primary_key
+        entity:
+          type: primary
+          name: customer
+        tests:
+          - unique
+          - not_null
+      - name: customer_name
+        description: Customer full name.
+        data_type: text
+      - name: segment
+        description: Business segment.
+        data_type: text
+        dimension:
+          type: categorical
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["retail", "institutional", "wealth", "sme"]
+      - name: risk_rating
+        description: Credit risk rating.
+        data_type: text
+        dimension:
+          type: categorical
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["A", "B", "C"]
+      - name: risk_tier
+        description: Human-readable risk tier.
+        data_type: text
+        dimension:
+          type: categorical
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["low_risk", "medium_risk", "high_risk"]
+      - name: kyc_date
+        description: KYC completion date.
+        data_type: date
+      - name: kyc_age_days
+        description: Days since KYC completion.
+        data_type: bigint
+      - name: country_code
+        description: ISO 2-letter country code.
+        data_type: text
+      - name: total_accounts
+        description: Number of accounts held by customer.
+        data_type: bigint
+      - name: total_deposits
+        description: Sum of balances on deposit accounts.
+        data_type: numeric
+      - name: total_credit_utilisation
+        description: Sum of balances on credit line accounts.
+        data_type: numeric
+      - name: customer_since
+        description: Earliest account open date.
+        data_type: date
+      - name: current_account_count
+        description: Number of current accounts.
+        data_type: bigint
+      - name: savings_account_count
+        description: Number of savings accounts.
+        data_type: bigint
+      - name: total_loans
+        description: Count of loans.
+        data_type: bigint
+      - name: total_loan_exposure
+        description: Sum of outstanding principal.
+        data_type: numeric
+      - name: npl_exposure
+        description: Sum of principal on non-performing loans.
+        data_type: numeric
+      - name: annual_interest_income
+        description: Estimated annual interest income.
+        data_type: numeric
+
+  - name: fct_loan_portfolio
+    description: >
+      Loan portfolio fact table enriched with Basel II risk metrics (PD, LGD,
+      EAD, EL, RWA) and customer attributes. Primary analytics surface for
+      credit risk and capital adequacy reporting.
+    semantic_model:
+      enabled: true
+    columns:
+      - name: loan_id
+        description: Unique loan identifier — primary key.
+        entity:
+          type: primary
+          name: loan
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Foreign key to dim_customers.
+        entity:
+          type: foreign
+          name: customer
+        tests:
+          - not_null
+      - name: customer_name
+        description: Customer full name.
+      - name: segment
+        description: Business segment.
+        dimension:
+          type: categorical
+      - name: risk_rating
+        description: Credit risk rating.
+      - name: risk_tier
+        description: Human-readable risk tier.
+        dimension:
+          type: categorical
+      - name: country_code
+        description: Country of customer domicile.
+        dimension:
+          type: categorical
+      - name: loan_type
+        description: Loan product type.
+        dimension:
+          type: categorical
+      - name: loan_status
+        description: Performing or non-performing.
+        dimension:
+          type: categorical
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["performing", "non-performing"]
+      - name: is_npl
+        description: True if loan is non-performing.
+        dimension:
+          type: categorical
+        tests:
+          - not_null
+      - name: principal
+        description: Outstanding principal balance.
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: "> 0"
+      - name: interest_rate
+        description: Annual interest rate percentage.
+      - name: origination_date
+        description: Loan origination date.
+        dimension:
+          type: time
+      - name: annual_interest_income
+        description: Estimated annual interest income.
+      - name: pd
+        description: Probability of Default.
+      - name: lgd
+        description: Loss Given Default.
+      - name: ead
+        description: Exposure at Default.
+      - name: expected_loss
+        description: Expected Loss = PD × LGD × EAD.
+      - name: risk_weight
+        description: Basel II risk weight.
+      - name: rwa
+        description: Risk-Weighted Asset.
+
+  - name: fct_transactions
+    description: >
+      Transaction fact table enriched with account and customer context.
+      Includes a running balance window function per account. Contains one
+      intentional bad row (T_BAD) caught by a warn-severity amount test.
+    semantic_model:
+      enabled: true
+    columns:
+      - name: txn_id
+        description: Unique transaction identifier — primary key.
+        entity:
+          type: primary
+          name: transaction
+        tests:
+          - unique
+          - not_null
+      - name: account_id
+        description: Foreign key to stg_accounts.
+        entity:
+          type: foreign
+          name: account
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_accounts')
+                field: account_id
+      - name: customer_id
+        description: Foreign key to dim_customers (via account).
+      - name: account_type
+        description: Account product type.
+      - name: amount
+        description: Raw transaction amount.
+        tests:
+          - dbt_utils.expression_is_true:
+              arguments:
+                expression: ">= 0"
+              config:
+                severity: warn
+      - name: signed_amount
+        description: Signed amount — positive for credits, negative for debits.
+      - name: txn_type
+        description: Transaction direction.
+      - name: txn_date
+        description: Transaction posting date.
+      - name: activity_period
+        description: Month-truncated transaction date.
+        dimension:
+          type: time
+      - name: category
+        description: Transaction category.
+        dimension:
+          type: categorical
+      - name: running_balance
+        description: Cumulative signed balance per account ordered by date and txn_id.
+
+  - name: monthly_nii
+    description: >
+      Monthly Net Interest Income report. Passthrough from
+      int_monthly_portfolio_metrics — the intermediate layer does all heavy lifting.
+    semantic_model:
+      enabled: true
+    columns:
+      - name: period_id
+        description: Surrogate key — row number ordered by reporting_period.
+        entity:
+          type: primary
+          name: nii_period
+        tests:
+          - unique
+          - not_null
+      - name: reporting_period
+        description: Month-truncated date of the reporting period.
+        dimension:
+          type: time
+        tests:
+          - not_null
+      - name: interest_income
+        description: Monthly interest income from performing loans.
+      - name: interest_expense
+        description: Estimated monthly funding cost on deposits.
+      - name: net_interest_income
+        description: Interest income minus interest expense.
+        tests:
+          - not_null
+      - name: active_loans
+        description: Count of performing loans originated in period.
+      - name: portfolio_balance
+        description: Sum of performing loan principals.
+      - name: total_deposits
+        description: Sum of deposit account balances.
+
+  - name: customer_risk_exposure
+    description: >
+      Aggregate view of customer risk and deposit exposure by segment and risk tier.
+      Useful for portfolio concentration analysis and regulatory reporting.
+    columns:
+      - name: segment
+        description: Business segment.
+      - name: risk_tier
+        description: Risk tier grouping.
+      - name: customer_count
+        description: Number of customers in the segment/tier combination.
+      - name: total_deposits
+        description: Total deposits held by customers in group.
+      - name: total_loan_exposure
+        description: Total outstanding loan principal.
+      - name: total_npl_exposure
+        description: Total principal on non-performing loans.
+      - name: npl_ratio_pct
+        description: NPL ratio as a percentage of total loan exposure.
+      - name: avg_annual_interest_income
+        description: Average annual interest income per customer.
+
+  - name: portfolio_npl_ratio
+    description: >
+      NPL ratio breakdown by segment plus a TOTAL row. Primary dashboard metric
+      for credit quality reporting to senior management and regulators.
+    columns:
+      - name: segment
+        description: Business segment or TOTAL.
+      - name: total_loans
+        description: Total number of loans in segment.
+      - name: npl_loans
+        description: Number of non-performing loans.
+      - name: total_exposure
+        description: Total outstanding principal.
+      - name: npl_exposure
+        description: Principal on non-performing loans.
+      - name: npl_ratio_pct
+        description: NPL ratio as percentage of total exposure.
+
+unit_tests:
+  - name: npl_flag_correctly_set
+    description: Verify that is_npl is true when loan_status is non-performing and false otherwise.
+    model: stg_loans
+    given:
+      - input: source('raw', 'raw_loans')
+        rows:
+          - {loan_id: "LT01", customer_id: "C001", principal: "10000", interest_rate: "5.0", loan_status: "non-performing", loan_type: "personal_loan", origination_date: "2023-01-01"}
+          - {loan_id: "LT02", customer_id: "C002", principal: "20000", interest_rate: "3.5", loan_status: "performing", loan_type: "mortgage", origination_date: "2022-06-15"}
+    expect:
+      rows:
+        - {loan_id: "LT01", is_npl: true}
+        - {loan_id: "LT02", is_npl: false}
+
+  - name: customer_risk_tier_assigned
+    description: Verify that risk_tier is correctly derived from risk_rating.
+    model: stg_customers
+    given:
+      - input: source('raw', 'raw_customers')
+        rows:
+          - {customer_id: "UT01", name: "Test A", segment: "retail", risk_rating: "A", kyc_date: "2020-01-01", country: "GB"}
+          - {customer_id: "UT02", name: "Test B", segment: "retail", risk_rating: "B", kyc_date: "2020-01-01", country: "DE"}
+          - {customer_id: "UT03", name: "Test C", segment: "retail", risk_rating: "C", kyc_date: "2020-01-01", country: "FR"}
+    expect:
+      rows:
+        - {customer_id: "UT01", risk_tier: "low_risk"}
+        - {customer_id: "UT02", risk_tier: "medium_risk"}
+        - {customer_id: "UT03", risk_tier: "high_risk"}
+
+  - name: expected_loss_calculation
+    description: Verify EL = PD × LGD × EAD for known inputs — A-rated performing loan.
+    model: int_loan_risk_metrics
+    given:
+      - input: ref('stg_loans')
+        rows:
+          - {loan_id: "EL01", customer_id: "ELC01", principal: 100000, interest_rate: 3.5, loan_status: "performing", loan_type: "mortgage", origination_date: "2022-01-01", is_npl: false, annual_interest_income: 3500}
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: "ELC01", customer_name: "EL Test", segment: "retail", risk_rating: "A", risk_tier: "low_risk", kyc_date: "2020-01-01", country_code: "GB", kyc_age_days: 1000}
+    expect:
+      rows:
+        - {loan_id: "EL01", pd: 0.005, lgd: 0.45, ead: 100000, expected_loss: 225.0}

@@ -1,0 +1,72 @@
+version: 2
+
+sources:
+  - name: raw
+    description: Raw seed tables loaded into the banking_demo_v2_raw schema.
+    schema: "{{ target.schema }}_raw"
+    tables:
+      - name: raw_customers
+        description: Customer master records with segmentation and KYC data.
+        columns:
+          - name: customer_id
+            description: Unique customer identifier.
+          - name: name
+            description: Customer full name.
+          - name: segment
+            description: Business segment.
+          - name: risk_rating
+            description: Credit risk rating (A, B, C).
+          - name: kyc_date
+            description: KYC completion date.
+          - name: country
+            description: ISO 2-letter country code.
+
+      - name: raw_accounts
+        description: Account records linked to customers.
+        columns:
+          - name: account_id
+            description: Unique account identifier.
+          - name: customer_id
+            description: Foreign key to raw_customers.
+          - name: account_type
+            description: Product type.
+          - name: open_date
+            description: Account open date.
+          - name: status
+            description: Account status.
+          - name: balance
+            description: Current balance.
+
+      - name: raw_transactions
+        description: Transaction ledger Jan–Jun 2024.
+        columns:
+          - name: txn_id
+            description: Unique transaction identifier.
+          - name: account_id
+            description: Foreign key to raw_accounts.
+          - name: amount
+            description: Transaction amount (raw — may include negative T_BAD row).
+          - name: txn_type
+            description: Credit or debit.
+          - name: txn_date
+            description: Transaction posting date.
+          - name: category
+            description: Transaction category.
+
+      - name: raw_loans
+        description: Loan book with 25 loans and performing/non-performing status.
+        columns:
+          - name: loan_id
+            description: Unique loan identifier.
+          - name: customer_id
+            description: Foreign key to raw_customers.
+          - name: principal
+            description: Outstanding principal.
+          - name: interest_rate
+            description: Annual interest rate percentage.
+          - name: loan_status
+            description: Performing or non-performing.
+          - name: loan_type
+            description: Loan product type.
+          - name: origination_date
+            description: Loan origination date.

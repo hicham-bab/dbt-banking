@@ -1,0 +1,49 @@
+version: 2
+
+metrics:
+  - name: total_loan_exposure
+    label: Total Loan Exposure
+    description: Total outstanding principal. Denominator for NPL ratio and capital adequacy.
+    type: simple
+    agg: sum
+    expr: principal
+    model: ref('fct_loan_portfolio')
+
+  - name: npl_loan_count
+    label: NPL Loan Count
+    description: Count of non-performing loans.
+    type: simple
+    agg: sum
+    expr: "case when is_npl then 1 else 0 end"
+    model: ref('fct_loan_portfolio')
+
+  - name: total_loan_count
+    label: Total Loan Count
+    type: simple
+    agg: count_distinct
+    expr: loan_id
+    model: ref('fct_loan_portfolio')
+
+  - name: total_expected_loss
+    label: Total Expected Loss
+    description: Sum of expected losses across portfolio. Basel II EL = PD × LGD × EAD.
+    type: simple
+    agg: sum
+    expr: expected_loss
+    model: ref('fct_loan_portfolio')
+
+  - name: total_deposits
+    label: Total Deposits
+    description: Sum of balances on deposit accounts (current, savings, fixed_deposit).
+    type: simple
+    agg: sum
+    expr: balance
+    model: ref('stg_accounts')
+
+  - name: net_interest_income
+    label: Net Interest Income
+    description: Monthly NII — interest earned on performing loans minus funding cost.
+    type: simple
+    agg: sum
+    expr: net_interest_income
+    model: ref('monthly_nii')
