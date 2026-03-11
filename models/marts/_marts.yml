@@ -159,6 +159,7 @@ models:
         description: Annual interest rate percentage.
       - name: origination_date
         description: Loan origination date.
+        granularity: day
         dimension:
           type: time
       - name: annual_interest_income
@@ -223,6 +224,7 @@ models:
         description: Transaction posting date.
       - name: activity_period
         description: Month-truncated transaction date.
+        granularity: month
         dimension:
           type: time
       - name: category
@@ -249,6 +251,7 @@ models:
           - not_null
       - name: reporting_period
         description: Month-truncated date of the reporting period.
+        granularity: month
         dimension:
           type: time
         tests:
