@@ -57,3 +57,13 @@ A055,C034,savings,2020-11-22,active,2400000.00
 A056,C034,fixed_deposit,2020-11-22,active,1800000.00
 A057,C035,current,2022-08-30,active,94000.00
 A058,C035,credit_line,2022-08-30,active,150000.00
+A059,C036,current,2023-05-10,active,12000.00
+A060,C036,credit_line,2023-05-10,active,80000.00
+A061,C037,current,2021-09-18,active,9400.00
+A062,C037,savings,2021-09-18,active,31000.00
+A063,C038,current,2019-04-22,active,9200000.00
+A064,C039,savings,2020-07-14,active,3100000.00
+A065,C039,fixed_deposit,2020-07-14,active,2500000.00
+A066,C040,current,2022-11-30,active,7200.00
+A067,C040,savings,2022-11-30,active,18500.00
+A068,C038,fixed_deposit,2019-04-22,active,5000000.00
