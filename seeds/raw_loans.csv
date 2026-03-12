@@ -24,3 +24,8 @@ L022,C024,850000.00,3.60,performing,mortgage,2020-06-30
 L023,C027,650000.00,3.90,performing,mortgage,2021-08-12
 L024,C028,250000.00,7.50,performing,sme_facility,2021-03-25
 L025,C029,180000.00,8.80,non-performing,sme_facility,2022-11-14
+L026,C031,14000.00,7.20,performing,personal_loan,2022-04-10
+L027,C032,5000000.00,3.10,performing,corporate_loan,2021-09-01
+L028,C033,9000.00,13.50,non-performing,personal_loan,2023-02-20
+L029,C034,1200000.00,2.95,performing,mortgage,2021-01-15
+L030,C035,320000.00,6.80,non-performing,sme_facility,2022-10-05
